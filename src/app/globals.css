@@ -1,11 +1,47 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Lato:wght@300;400;700&display=swap');
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Fontes */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body:    'Lato', system-ui, sans-serif;
+
+  /* Cores primárias */
+  --color-amber:        #B5651D;
+  --color-amber-dark:   #8B4513;
+  --color-amber-light:  #D4A853;
+
+  /* Neutras */
+  --color-cream:        #FAF6F0;
+  --color-paper:        #F0E8D8;
+  --color-beige:        #D4C5A9;
+  --color-brown:        #3D2B1F;
+  --color-warm-gray:    #8A7560;
+
+  /* Status */
+  --color-sage:         #6B8F71;
+  --color-terracotta:   #C17B5C;
+  --color-soft-red:     #B85C5C;
+
+  /* Border radius */
+  --radius-sm:   6px;
+  --radius-md:   12px;
+  --radius-lg:   20px;
+  --radius-xl:   32px;
+  --radius-full: 9999px;
 }
 
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  font-family: var(--font-body);
+  background: var(--color-cream);
+  color: var(--color-brown);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
 }

@@ -3,15 +3,47 @@
 import { useState, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
-import { Upload, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, X, AlertCircle, CheckCircle, ChevronLeft, Shield, Lock } from 'lucide-react'
 import { PLANS } from '@/lib/plans'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
+
+const STEPS = ['Escolha o plano', 'Envie a foto', 'Seus dados']
+
+function ProgressBar({ current }: { current: number }) {
+  return (
+    <div className="w-full mb-8">
+      <div className="flex items-center justify-between mb-3">
+        {STEPS.map((label, i) => (
+          <div key={i} className="flex flex-col items-center flex-1">
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%',
+              backgroundColor: i < current ? 'var(--color-sage)' : i === current ? 'var(--color-amber)' : 'var(--color-beige)',
+              color: i <= current ? 'white' : 'var(--color-warm-gray)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 700,
+              transition: 'all 0.3s',
+            }}>
+              {i < current ? <CheckCircle className="h-4 w-4" /> : i + 1}
+            </div>
+            <span style={{ fontSize: 11, marginTop: 6, color: i === current ? 'var(--color-amber)' : 'var(--color-warm-gray)', fontWeight: i === current ? 700 : 400, textAlign: 'center' }}>
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ height: 4, backgroundColor: 'var(--color-beige)', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ height: '100%', backgroundColor: 'var(--color-amber)', borderRadius: 4, width: `${(current / (STEPS.length - 1)) * 100}%`, transition: 'width 0.4s ease' }} />
+      </div>
+    </div>
+  )
+}
 
 function UploadForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const initialPlan = searchParams.get('plan') || 'avulso'
 
+  const [step, setStep] = useState(0)
   const [selectedPlan, setSelectedPlan] = useState(initialPlan)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -33,15 +65,20 @@ function UploadForm() {
     maxFiles: 1,
   })
 
+  const plan = PLANS.find((p) => p.id === selectedPlan)
+
+  const handleNext = () => {
+    if (step === 1 && !file) { setError('Selecione uma foto para continuar.'); return }
+    setError(null)
+    setStep((s) => s + 1)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) { setError('Selecione uma foto para restaurar.'); return }
-
+    if (!file) return
     setLoading(true)
     setError(null)
-
     try {
-      // 1. Cria o pedido e gera preferência de pagamento
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,23 +89,16 @@ function UploadForm() {
           plan_id: selectedPlan,
         }),
       })
-
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Erro ao criar pedido')
       }
-
       const { order_id, checkout_url } = await res.json()
-
-      // 2. Faz upload da foto original
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('order_id', order_id)
-      formData.append('type', 'original')
-
-      await fetch('/api/upload', { method: 'POST', body: formData })
-
-      // 3. Redireciona para o checkout do Mercado Pago
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('order_id', order_id)
+      fd.append('type', 'original')
+      await fetch('/api/upload', { method: 'POST', body: fd })
       window.location.href = checkout_url
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado')
@@ -76,138 +106,230 @@ function UploadForm() {
     }
   }
 
-  const plan = PLANS.find((p) => p.id === selectedPlan)
-
   return (
-    <div className="min-h-screen bg-zinc-50 py-12 px-4">
-      <div className="mx-auto max-w-2xl">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-cream)' }}>
 
-        <div className="mb-8 text-center">
-          <a href="/" className="text-xl font-bold tracking-tight">RestauraPic</a>
-          <h1 className="mt-4 text-2xl font-bold">Faça seu pedido</h1>
-          <p className="text-zinc-500 text-sm mt-1">Preencha os dados e envie sua foto</p>
+      {/* Header */}
+      <header style={{ borderBottom: '1px solid var(--color-beige)', backgroundColor: 'white', padding: '16px 24px' }}>
+        <div className="mx-auto max-w-xl flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <div style={{ width: 32, height: 32, border: '2px solid var(--color-amber)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-amber)', fontSize: 16 }}>♡</div>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: 'var(--color-brown)' }}>
+              Reviver <span style={{ color: 'var(--color-amber)' }}>Memórias</span>
+            </span>
+          </Link>
+          <div className="flex items-center gap-1" style={{ fontSize: 12, color: 'var(--color-warm-gray)' }}>
+            <Lock className="h-3 w-3" />
+            <span>Pagamento seguro</span>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-xl px-4 py-10">
+
+        {/* Título */}
+        <div className="text-center mb-8">
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, color: 'var(--color-brown)', marginBottom: 6 }}>
+            Restaure sua memória
+          </h1>
+          <p style={{ fontSize: 15, color: 'var(--color-warm-gray)' }}>Passo {step + 1} de {STEPS.length}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm">
+        {/* Barra de progresso */}
+        <ProgressBar current={step} />
 
-          {/* Seleção de plano */}
-          <div>
-            <label className="block text-sm font-medium mb-3">Escolha o plano</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {PLANS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setSelectedPlan(p.id)}
-                  className={cn(
-                    'rounded-xl border p-3 text-left transition-all',
-                    selectedPlan === p.id
-                      ? 'border-amber-500 bg-amber-50 ring-1 ring-amber-500'
-                      : 'border-zinc-200 hover:border-zinc-300'
-                  )}
-                >
-                  <p className="font-semibold text-sm">{p.name}</p>
-                  <p className="text-amber-600 font-bold text-sm">{p.price_label}</p>
-                  <p className="text-zinc-400 text-xs mt-0.5">
-                    {p.max_photos === 'unlimited' ? 'Ilimitado' : `${p.max_photos} foto${p.max_photos > 1 ? 's' : ''}`}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Card do formulário */}
+        <div style={{ backgroundColor: 'white', border: '1px solid var(--color-beige)', borderRadius: 'var(--radius-xl)', padding: 32, boxShadow: '0 4px 24px rgba(61,43,31,0.08)' }}>
 
-          {/* Upload da foto */}
-          <div>
-            <label className="block text-sm font-medium mb-3">Foto para restaurar</label>
-            {!file ? (
-              <div
-                {...getRootProps()}
-                className={cn(
-                  'rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors',
-                  isDragActive ? 'border-amber-400 bg-amber-50' : 'border-zinc-200 hover:border-zinc-300'
-                )}
-              >
-                <input {...getInputProps()} />
-                <Upload className="mx-auto h-8 w-8 text-zinc-400 mb-3" />
-                <p className="text-sm font-medium text-zinc-600">
-                  {isDragActive ? 'Solte a foto aqui' : 'Clique ou arraste a foto aqui'}
-                </p>
-                <p className="text-xs text-zinc-400 mt-1">JPEG, PNG ou WEBP · máx 20MB</p>
+          {/* ── PASSO 0: Plano ── */}
+          {step === 0 && (
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--color-brown)', marginBottom: 4 }}>Escolha seu plano</h2>
+              <p style={{ fontSize: 14, color: 'var(--color-warm-gray)', marginBottom: 24 }}>Quantas fotos você quer restaurar?</p>
+              <div className="flex flex-col gap-3">
+                {PLANS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedPlan(p.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '16px 20px', borderRadius: 'var(--radius-md)', textAlign: 'left', width: '100%',
+                      border: selectedPlan === p.id ? '2px solid var(--color-amber)' : '1.5px solid var(--color-beige)',
+                      backgroundColor: selectedPlan === p.id ? '#FEFBF5' : 'white',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${selectedPlan === p.id ? 'var(--color-amber)' : 'var(--color-beige)'}`, backgroundColor: selectedPlan === p.id ? 'var(--color-amber)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {selectedPlan === p.id && <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'white' }} />}
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--color-brown)' }}>{p.name}</span>
+                          {p.highlight && <span style={{ backgroundColor: 'var(--color-amber)', color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>Popular</span>}
+                        </div>
+                        <span style={{ fontSize: 13, color: 'var(--color-warm-gray)' }}>
+                          {p.max_photos === 'unlimited' ? 'Fotos ilimitadas' : `${p.max_photos} foto${Number(p.max_photos) > 1 ? 's' : ''}`} · {p.description}
+                        </span>
+                      </div>
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--color-amber)', flexShrink: 0, marginLeft: 12 }}>{p.price_label}</span>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="relative rounded-xl overflow-hidden border border-zinc-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview!} alt="Preview" className="w-full max-h-56 object-cover" />
-                <button
-                  type="button"
-                  onClick={() => { setFile(null); setPreview(null) }}
-                  className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-                <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-3 py-2">
-                  <p className="text-xs text-white truncate">{file.name}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Dados do cliente */}
-          <div className="space-y-4">
-            <label className="block text-sm font-medium">Seus dados</label>
-            <input
-              type="text"
-              placeholder="Nome completo"
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-            />
-            <input
-              type="tel"
-              placeholder="WhatsApp com DDD (ex: 11999999999)"
-              required
-              value={form.whatsapp}
-              onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 px-4 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-            />
-          </div>
-
-          {/* Erro */}
-          {error && (
-            <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
+              <button
+                type="button"
+                onClick={handleNext}
+                style={{ marginTop: 24, width: '100%', backgroundColor: 'var(--color-amber)', color: 'white', border: 'none', borderRadius: 'var(--radius-full)', padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+                className="hover:opacity-90 transition-opacity">
+                Continuar →
+              </button>
             </div>
           )}
 
-          {/* Resumo + botão */}
-          <div className="border-t border-zinc-100 pt-4">
-            <div className="flex items-center justify-between mb-4 text-sm">
-              <span className="text-zinc-500">Total a pagar</span>
-              <span className="text-xl font-bold text-amber-600">{plan?.price_label}</span>
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-full bg-amber-600 py-3 text-sm font-semibold text-white hover:bg-amber-700 transition-colors disabled:opacity-60"
-            >
-              {loading ? 'Aguarde...' : `Pagar ${plan?.price_label} e restaurar`}
-            </button>
-            <p className="text-center text-xs text-zinc-400 mt-3">
-              Pague via Pix, cartão de crédito ou débito
-            </p>
-          </div>
+          {/* ── PASSO 1: Foto ── */}
+          {step === 1 && (
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--color-brown)', marginBottom: 4 }}>Envie sua foto</h2>
+              <p style={{ fontSize: 14, color: 'var(--color-warm-gray)', marginBottom: 24 }}>Quanto pior o estado da foto, mais impressionante fica o resultado.</p>
 
-        </form>
+              {!file ? (
+                <div {...getRootProps()} style={{
+                  border: `2px dashed ${isDragActive ? 'var(--color-amber)' : 'var(--color-beige)'}`,
+                  borderRadius: 'var(--radius-lg)', padding: 40, textAlign: 'center', cursor: 'pointer',
+                  backgroundColor: isDragActive ? '#FEFBF5' : 'var(--color-cream)', transition: 'all 0.2s',
+                }}>
+                  <input {...getInputProps()} />
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>📷</div>
+                  <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--color-brown)', marginBottom: 6 }}>
+                    {isDragActive ? 'Solte a foto aqui' : 'Clique ou arraste a foto aqui'}
+                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--color-warm-gray)' }}>JPEG, PNG ou WEBP · máximo 20MB</p>
+                  <div style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: 'var(--color-amber)', color: 'white', borderRadius: 'var(--radius-full)', padding: '10px 24px', fontSize: 14, fontWeight: 700 }}>
+                    <Upload className="h-4 w-4" />
+                    Selecionar foto
+                  </div>
+                </div>
+              ) : (
+                <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-beige)', position: 'relative' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview!} alt="Preview da foto" style={{ width: '100%', maxHeight: 240, objectFit: 'cover' }} />
+                  <button type="button" onClick={() => { setFile(null); setPreview(null) }}
+                    style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+                    <X className="h-4 w-4" />
+                  </button>
+                  <div style={{ backgroundColor: 'var(--color-brown)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CheckCircle className="h-4 w-4" style={{ color: 'var(--color-sage)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--color-cream)' }}>{file.name}</span>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius-md)', padding: '12px 16px', fontSize: 14, color: '#991B1B' }}>
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                <button type="button" onClick={() => { setError(null); setStep(0) }}
+                  style={{ flex: 1, border: '1.5px solid var(--color-beige)', backgroundColor: 'transparent', borderRadius: 'var(--radius-full)', padding: '12px', fontSize: 14, fontWeight: 700, color: 'var(--color-brown)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <ChevronLeft className="h-4 w-4" /> Voltar
+                </button>
+                <button type="button" onClick={handleNext}
+                  style={{ flex: 2, backgroundColor: 'var(--color-amber)', color: 'white', border: 'none', borderRadius: 'var(--radius-full)', padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                  className="hover:opacity-90 transition-opacity">
+                  Continuar →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── PASSO 2: Dados ── */}
+          {step === 2 && (
+            <form onSubmit={handleSubmit}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--color-brown)', marginBottom: 4 }}>Seus dados</h2>
+              <p style={{ fontSize: 14, color: 'var(--color-warm-gray)', marginBottom: 24 }}>Para entregarmos sua foto restaurada.</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {[
+                  { label: 'Nome completo', key: 'name', type: 'text', placeholder: 'Como posso te chamar?' },
+                  { label: 'Email', key: 'email', type: 'email', placeholder: 'Para confirmar seu pedido' },
+                  { label: 'WhatsApp (com DDD)', key: 'whatsapp', type: 'tel', placeholder: 'Ex: 11 99999-9999' },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--color-brown)', marginBottom: 6 }}>{field.label}</label>
+                    <input
+                      type={field.type}
+                      required
+                      placeholder={field.placeholder}
+                      value={form[field.key as keyof typeof form]}
+                      onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
+                      style={{ width: '100%', padding: '12px 16px', border: '1.5px solid var(--color-beige)', borderRadius: 'var(--radius-md)', fontSize: 14, color: 'var(--color-brown)', backgroundColor: 'white', outline: 'none', fontFamily: 'var(--font-body)' }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Resumo do pedido */}
+              <div style={{ marginTop: 24, backgroundColor: 'var(--color-paper)', borderRadius: 'var(--radius-md)', padding: '16px 20px' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--color-warm-gray)', marginBottom: 12 }}>Resumo do pedido</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--color-brown)' }}>Plano {plan?.name}</p>
+                    <p style={{ fontSize: 12, color: 'var(--color-warm-gray)' }}>{plan?.description}</p>
+                  </div>
+                  <p style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--color-amber)' }}>{plan?.price_label}</p>
+                </div>
+                {file && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-beige)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CheckCircle className="h-4 w-4" style={{ color: 'var(--color-sage)' }} />
+                    <span style={{ fontSize: 13, color: 'var(--color-warm-gray)' }}>1 foto anexada</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Garantias */}
+              <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {[
+                  { icon: Shield, text: 'Pagamento seguro' },
+                  { icon: Lock, text: 'Seus dados protegidos' },
+                  { icon: CheckCircle, text: 'Garantia de satisfação' },
+                ].map((g) => (
+                  <div key={g.text} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-warm-gray)' }}>
+                    <g.icon className="h-3 w-3" style={{ color: 'var(--color-sage)' }} />
+                    {g.text}
+                  </div>
+                ))}
+              </div>
+
+              {error && (
+                <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius-md)', padding: '12px 16px', fontSize: 14, color: '#991B1B' }}>
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                <button type="button" onClick={() => { setError(null); setStep(1) }}
+                  style={{ flex: 1, border: '1.5px solid var(--color-beige)', backgroundColor: 'transparent', borderRadius: 'var(--radius-full)', padding: '14px', fontSize: 14, fontWeight: 700, color: 'var(--color-brown)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <ChevronLeft className="h-4 w-4" /> Voltar
+                </button>
+                <button type="submit" disabled={loading}
+                  style={{ flex: 2, backgroundColor: loading ? 'var(--color-beige)' : 'var(--color-amber)', color: 'white', border: 'none', borderRadius: 'var(--radius-full)', padding: '14px', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
+                  {loading ? 'Aguarde...' : `Pagar ${plan?.price_label} →`}
+                </button>
+              </div>
+
+              <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--color-warm-gray)', marginTop: 12 }}>
+                Você será redirecionado para o pagamento seguro via Mercado Pago
+              </p>
+            </form>
+          )}
+
+        </div>
       </div>
     </div>
   )

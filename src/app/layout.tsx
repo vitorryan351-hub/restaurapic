@@ -1,20 +1,23 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
 import './globals.css'
 
-const geist = Geist({ subsets: ['latin'] })
-
 export const metadata: Metadata = {
-  title: 'RestauraPic — Restaure Suas Memórias',
+  title: 'Reviver Memórias — Suas memórias merecem durar para sempre',
   description:
-    'Restauração profissional de fotos antigas e danificadas com IA. Resultados em até 24h. Pague via Pix.',
-  keywords: 'restauração de fotos, restaurar foto antiga, restaurar foto danificada, colorização de fotos',
+    'Restauramos fotos antigas e danificadas com carinho. Entrega em até 24h por WhatsApp. Pague via Pix. Garantia de satisfação.',
+  keywords: 'restauração de fotos, restaurar foto antiga, colorização de fotos, foto danificada, memórias',
+  openGraph: {
+    title: 'Reviver Memórias',
+    description: 'Suas memórias merecem durar para sempre.',
+    locale: 'pt_BR',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className="h-full antialiased">
-      <body className={`${geist.className} min-h-full flex flex-col`}>{children}</body>
+    <html lang="pt-BR" className="h-full">
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   )
 }
